@@ -48,7 +48,7 @@ void isa_write(unsigned int addr, unsigned char val) {
   // Only use the three least significant bits of the address
   addr &= B00000111;
 
-  // Shift left twite to move addr bits past the data pins on PORTB
+  // Shift left twice to move addr bits past the two data bits on PORTB
   addr << 2;
 
   // Write the isa address
