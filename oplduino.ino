@@ -20,7 +20,7 @@
  * N/A (UNUSED)         -
  */
 
-void isa_write(unsigned int addr, unsigned byte val) {
+void isa_write(unsigned int addr, unsigned char val) {
   // Set iowrite pin HIGH while we manipulate ports
   // (TODO: HIGH or LOW?)
   PORTB |= B00100000;
