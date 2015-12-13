@@ -1,3 +1,10 @@
+// uncomment this line to run test sequence,
+// should generate a test tone from sound card
+#define TEST_TONE
+
+// Base ISA address of the OPL3 chip
+#define OPL3_BASE 0x220
+
 /**
  * Pin layout
  *
@@ -69,6 +76,15 @@ void isa_write(unsigned int addr, unsigned char val) {
   PORTB &= B11011111;
 }
 
+// Helper function for writing a value to both left/right OPL3
+// registers
+void opl_write_stereo(unsigned char reg, unsigned char val) {
+    isa_write(OPL3_BASE + 0, reg);
+    isa_write(OPL3_BASE + 1, val);
+    isa_write(OPL3_BASE + 2, reg);
+    isa_write(OPL3_BASE + 3, val);
+}
+
 void setup() {
   // Set this as high as possible without data corruption
   Serial.begin(230400);
@@ -125,6 +141,46 @@ byte data = 0;
 byte io_addr = 0;
 
 void loop() {
+  #ifdef TEST_TONE
+
+  // Test mode: play a simple tone to test the setup
+  // See the "Making a Sound" section of:
+  // http://www.floodgap.com/retrobits/ckb/secret/adlib.txt
+
+  // Start by zeroing out every register of the OPL3.
+  // "Quick-and-dirty method of resetting the sound card,
+  // but it works", according to above guide
+  for (int i = 0; i <= 0xFF; i++) {
+      opl_write_stereo(i, 0x00);
+  }
+
+  // Set the modulator's multiple to 1
+  opl_write_stereo(0x20, 0x01);
+  // Set the modulator's level to about 40 dB
+  opl_write_stereo(0x40, 0x10);
+  // Modulator attack:  quick;   decay:   long
+  opl_write_stereo(0x60, 0xF0);
+  // Modulator sustain: medium;  release: medium
+  opl_write_stereo(0x80, 0x77);
+  // Set voice frequency's LSB (it'll be a D#)
+  opl_write_stereo(0xA0, 0x98);
+  // Set the carrier's multiple to 1
+  opl_write_stereo(0x23, 0x01);
+  // Set the carrier to maximum volume (about 47 dB)
+  opl_write_stereo(0x43, 0x00);
+  // Carrier attack:  quick;   decay:   long
+  opl_write_stereo(0x63, 0xF0);
+  // Carrier sustain: medium;  release: medium
+  opl_write_stereo(0x83, 0x77);
+  // Turn the voice on; set the octave and freq MSB
+  opl_write_stereo(0xB0, 0x31);
+
+  // wait a second
+  delay(1000);
+
+  #else
+
+  // Normal operation: receive OPL3 commands over serial port
   while (true) {
     // Only the two least significant bits of the isa address are sent over
     // serial. Here we read bytes from the serial port until they are one of
@@ -142,5 +198,7 @@ void loop() {
   // Convert the hex string into a char
   data = strtol(hex_s, NULL, 16);
 
-  isa_write(io_addr, data);
+  isa_write(OPL3_BASE + io_addr, data);
+
+  #endif
 }
