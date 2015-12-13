@@ -96,6 +96,9 @@ void setup() {
   /**
    * Initialize mixer
    */
+  // For mixer documentation, see chapter 4 of:
+  // https://pdos.csail.mit.edu/6.828/2014/readings/hardware/SoundBlaster.pdf
+
   // Reset mixer
   isa_write(0x204, 0x00); // Select reset register
   isa_write(0x205, 0x00); // Write anything to reset register
