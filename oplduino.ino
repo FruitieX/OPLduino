@@ -5,6 +5,10 @@
 // Base ISA address of the OPL3 chip
 #define OPL3_BASE 0x220
 
+//#define SB2
+//#define SBPRO
+#define SB16
+
 /**
  * Pin layout
  *
@@ -27,7 +31,14 @@
  * N/A (UNUSED)         -
  */
 
+char debug_s[32];
+
 void isa_write(unsigned int addr, unsigned char val) {
+  #ifdef TEST_TONE
+  snprintf(debug_s, 32, "%02x, %02x", addr, val);
+  Serial.println(debug_s);
+  #endif
+  
   // Set iowrite pin HIGH while we manipulate ports
   // (TODO: HIGH or LOW?)
   PORTB |= B00100000;
@@ -87,7 +98,8 @@ void opl_write_stereo(unsigned char reg, unsigned char val) {
 
 void setup() {
   // Set this as high as possible without data corruption
-  Serial.begin(230400);
+  //Serial.begin(230400);
+  Serial.begin(115200);
 
   // Set isa data, address & iowrite pins as outputs
   DDRD = DDRD | B11111100;
@@ -104,7 +116,7 @@ void setup() {
   isa_write(0x205, 0x00); // Write anything to reset register
 
   /* Sound Blaster 2.0 */
-  /*
+  #ifdef SB2
   // Set master volume to 0 dB
   isa_write(0x204, 0x02); // Select master volume register
   isa_write(0x205, 0x0E); // Set volume to 0 dB
@@ -112,10 +124,10 @@ void setup() {
   // Set midi volume to 0 dB
   isa_write(0x204, 0x06); // Select midi volume register
   isa_write(0x205, 0x0E); // Set volume to 0 dB
-  */
+  #endif
 
   /* Sound Blaster Pro */
-  /*
+  #ifdef SBPRO
   // Set master volume to 0 dB
   isa_write(0x204, 0x22); // Select master volume register
   isa_write(0x205, 0xEE); // Set L/R channels to 0 dB
@@ -123,9 +135,10 @@ void setup() {
   // Set midi volume to 0 dB
   isa_write(0x204, 0x26); // Select midi volume register
   isa_write(0x205, 0xEE); // Set L/R channels to 0 dB
-  */
+  #endif
 
   /* Sound Blaster 16 */
+  #ifdef SB16
   // Set master volume to 0 dB
   isa_write(0x204, 0x30); // Select master left volume register
   isa_write(0x205, 0xF8); // Set volume to 0 dB
@@ -137,6 +150,7 @@ void setup() {
   isa_write(0x205, 0xF8); // Set volume to 0 dB
   isa_write(0x204, 0x35); // Select midi right volume register
   isa_write(0x205, 0xF8); // Set volume to 0 dB
+  #endif
 }
 
 char hex_s[2];
