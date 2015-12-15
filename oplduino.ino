@@ -7,7 +7,7 @@
 
 //#define SB2
 //#define SBPRO
-#define SB16
+//#define SB16
 
 /**
  * Pin layout
@@ -45,12 +45,12 @@ void isa_read(unsigned int addr) {
   int b_temp = PORTB;
   int d_temp = PORTD;
   
-  // Zero isa data & isa addr pins on PORTB (set data pins to 1 as data is inverted)
+  // Zero isa data & isa addr pins on PORTB
   b_temp &= B11100000;
   //b_temp &= B11100011;
   //b_temp |= B00000011;
 
-  // Zero isa data pins on PORTD (set to 1 as data is inverted)
+  // Zero isa data pins on PORTD
   d_temp &= B00000011;
   //d_temp |= B11111100;
 
@@ -72,7 +72,11 @@ void isa_read(unsigned int addr) {
   PORTD = d_temp;
   
   // Set ioread pin LOW to initiate read
-  // Two Arduino cycles needed to meet 150 ns (but is this only relevant when writing directly to OPL3?)
+  // An ioread pulse on the PC is ~ 800 ns, six PORTC writes are enough to emulate this
+  PORTC &= B11111110;
+  PORTC &= B11111110;
+  PORTC &= B11111110;
+  PORTC &= B11111110;
   PORTC &= B11111110;
   PORTC &= B11111110;
 
@@ -81,10 +85,9 @@ void isa_read(unsigned int addr) {
 }
 
 void do_6_reads() {
-  for(int i = 0; i < 3; i++) {
-    isa_read(OPL3_BASE + 0);
-    isa_read(OPL3_BASE + 2);
-  }
+  // PC does 6 reads, but Arduino is slow :-)
+  isa_read(OPL3_BASE + 0);
+  isa_read(OPL3_BASE + 2);
 }
 
 void isa_write(unsigned int addr, unsigned char val) {
@@ -93,10 +96,10 @@ void isa_write(unsigned int addr, unsigned char val) {
   //Serial.println(debug_s);
   #endif
 
-  // Make sure ioread pin is HIGH
+  // Make sure ioread is HIGH
   PORTC |= B00000001;
   
-  // Set iowrite pin HIGH while we manipulate ports
+  // Make sure iowrite is HIGH
   // (TODO: HIGH or LOW?)
   PORTB |= B00100000;
 
@@ -141,32 +144,51 @@ void isa_write(unsigned int addr, unsigned char val) {
   // TODO: Measure the time between setting the values above and the latch
   // below; is it enough?
 
-  delayMicroseconds(10);
+  // Actual PC waits ~600 ns here
+  delayMicroseconds(1);
 
-  // Set iowrite pin LOW to latch the data
+  // First set iowrite pin LOW
   // (TODO: HIGH or LOW?)
   PORTB &= B11011111;
 
-  delayMicroseconds(10);
+  // Actual PC waits ~600 ns here
+  delayMicroseconds(1);
+  
+  // Then set iowrite pin HIGH to latch the data
+  // (TODO: HIGH or LOW?)
+  PORTB &= B11011111;
+
+  // Data & address must remain unchanged for > 60ns here to match analysis from PC
+  // Let's hope returning from this function takes longer than that :-)
 }
 
 // Helper function for writing a value to both left/right OPL3
 // registers
 void opl_write_stereo(unsigned char reg, unsigned char val) {
     isa_write(OPL3_BASE + 0, reg);
+    // Here we must wait at least 3.3us according to OPL3 documentation, PC waits ~ 10us
     do_6_reads();
     isa_write(OPL3_BASE + 1, val);
+    // Here we must wait at least 23us according to OPL3 documentation, PC waits ~ 50us
     do_6_reads();
-    isa_write(OPL3_BASE + 2, reg);
     do_6_reads();
-    isa_write(OPL3_BASE + 3, val);
     do_6_reads();
+    do_6_reads();
+    do_6_reads();
+    do_6_reads();
+    do_6_reads();
+    do_6_reads();
+    //isa_write(OPL3_BASE + 2, reg);
+    //do_6_reads();
+    //isa_write(OPL3_BASE + 3, val);
+    //do_6_reads();
 }
 
 void setup() {
   // Set this as high as possible without data corruption
   //Serial.begin(230400);
-  Serial.begin(115200);
+  //Serial.begin(115200);
+  Serial.begin(9600);
 
   // Set isa data, address & iowrite/read pins as outputs
   DDRD = DDRD | B11111100;
@@ -180,9 +202,11 @@ void setup() {
   // https://pdos.csail.mit.edu/6.828/2014/readings/hardware/SoundBlaster.pdf
 
   // Reset mixer
+  /*
   isa_write(0x224, 0x00); // Select reset register
   isa_write(0x225, 0x00); // Write anything to reset register
-
+  */
+  
   /* Sound Blaster 2.0 */
   #ifdef SB2
   // Set master volume to 0 dB
@@ -236,12 +260,11 @@ void loop() {
   // "Quick-and-dirty method of resetting the sound card,
   // but it works", according to above guide
   for (int i = 0; i <= 0xFF; i++) {
-      opl_write_stereo(i, 0x00);
+      //opl_write_stereo(i, 0x00);
   }
 
   //isa_write(0x220, 0x01);
 
-  /*
   // Set the modulator's multiple to 1
   opl_write_stereo(0x20, 0x01);
   // Set the modulator's level to about 40 dB
@@ -262,7 +285,7 @@ void loop() {
   opl_write_stereo(0x83, 0x77);
   // Turn the voice on; set the octave and freq MSB
   opl_write_stereo(0xB0, 0x31);
-  */
+/*
 
   // readout from logic analyzer
   opl_write_stereo(0x68, 0xFE);
@@ -281,11 +304,10 @@ void loop() {
   opl_write_stereo(0xA3, 0x81);
   opl_write_stereo(0x48, 0x0B);
   opl_write_stereo(0x4B, 0x1D);
-  
-
+  */
   // wait a second
-  delay(1000);
-  //delayMicroseconds(1);
+  //delay(1000);
+  delayMicroseconds(100);
 
   #else
 
